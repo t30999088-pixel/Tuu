@@ -1,0 +1,339 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نرخ‌نما | قیمت طلا و دلار</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Tahoma,Arial,sans-serif;
+  background:#10151d;
+  color:#f5f5f5;
+}
+header{
+  padding:20px;
+  background:#192331;
+  border-bottom:1px solid #344255;
+}
+.clock{
+  text-align:right;
+  color:#b9c9dc;
+  line-height:2;
+}
+h1{
+  color:#e9bd62;
+  margin:12px 0;
+}
+main{
+  max-width:850px;
+  margin:25px auto;
+  padding:15px;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:15px;
+}
+.card{
+  background:#1b2736;
+  border:1px solid #344255;
+  border-radius:15px;
+  padding:22px;
+}
+.card h2{
+  font-size:17px;
+  color:#b9c9dc;
+}
+.price{
+  font-size:25px;
+  font-weight:bold;
+  color:#e9bd62;
+  margin:18px 0;
+}
+.small{
+  color:#9eacbd;
+  font-size:12px;
+}
+.signal{
+  margin-top:20px;
+  text-align:center;
+}
+.signal-value{
+  font-size:27px;
+  color:#e9bd62;
+  font-weight:bold;
+  margin:15px;
+}
+button{
+  background:#d5a94e;
+  border:0;
+  padding:12px 22px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:bold;
+}
+footer{
+  text-align:center;
+  color:#8795a7;
+  padding:25px;
+  font-size:12px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="clock">
+    <div id="time">در حال دریافت ساعت...</div>
+    <div id="date"></div>
+  </div>
+  <h1>نرخ‌نما</h1>
+  <div class="small">نمایش قیمت طلا و دلار بازار آزاد</div>
+</header>
+
+<main>
+
+<div class="grid">
+
+  <section class="card">
+    <h2>طلای ۱۸ عیار</h2>
+    <div class="price" id="goldPrice">—</div>
+    <div class="small">تومان / هر گرم</div>
+    <p class="small" id="goldUpdated">منتظر دریافت داده...</p>
+  </section>
+
+  <section class="card">
+    <h2>دلار آزاد</h2>
+    <div class="price" id="usdPrice">—</div>
+    <div class="small">تومان / هر دلار</div>
+    <p class="small" id="usdUpdated">منتظر دریافت داده...</p>
+  </section>
+
+</div>
+
+<section class="card signal">
+  <h2>تحلیل آزمایشی طلای ۱۸ عیار</h2>
+  <div class="signal-value" id="signalValue">در انتظار داده</div>
+  <p id="signalReason" class="small">
+    برای تحلیل به داده‌های تاریخی معتبر نیاز است.
+  </p>
+  <p class="small">
+    افق تحلیل: ۳۰ روز آینده
+  </p>
+</section>
+
+<section class="card" style="margin-top:15px">
+  <div id="connection" class="small">
+    در حال بررسی اتصال...
+  </div>
+  <button onclick="refreshPrices()" style="margin-top:15px">
+    به‌روزرسانی قیمت‌ها
+  </button>
+</section>
+
+</main>
+
+<footer>
+  نرخ‌نما | اطلاعات بازار و تحلیل الگوریتمی آزمایشی
+</footer>
+
+<script>
+
+// ساعت و تاریخ ایران
+function updateClock(){
+  const now=new Date();
+
+  document.getElementById("time").textContent=
+    new Intl.DateTimeFormat("fa-IR",{
+      timeZone:"Asia/Tehran",
+      hour:"2-digit",
+      minute:"2-digit",
+      second:"2-digit"
+    }).format(now);
+
+  document.getElementById("date").textContent=
+    new Intl.DateTimeFormat("fa-IR",{
+      timeZone:"Asia/Tehran",
+      weekday:"long",
+      year:"numeric",
+      month:"long",
+      day:"numeric",
+      calendar:"persian"
+    }).format(now);
+}
+
+setInterval(updateClock,1000);
+updateClock();
+
+
+// آدرس API پس از تأیید مستندات باید تنظیم شود
+const API_URL="";
+const GOLD_HISTORY_URL="";
+
+const $=id=>document.getElementById(id);
+
+function formatPrice(value){
+  return Number(value).toLocaleString("fa-IR");
+}
+
+
+// بررسی تاریخچه و محاسبه RSI
+function predict(prices){
+
+  if(!Array.isArray(prices)||prices.length<35)
+    return null;
+
+  const a=prices.map(Number);
+
+  if(a.some(x=>!Number.isFinite(x)||x<=0))
+    return null;
+
+  const mean=(arr,n)=>
+    arr.slice(-n).reduce((s,x)=>s+x,0)/n;
+
+  const changes=a.slice(1).map((x,i)=>x-a[i]);
+
+  let gains=0;
+  let losses=0;
+
+  changes.slice(-14).forEach(x=>{
+    if(x>0) gains+=x;
+    else losses-=x;
+  });
+
+  let rsi;
+
+  if(losses===0)
+    rsi=gains===0?50:100;
+  else{
+    const rs=gains/losses;
+    rsi=100-(100/(1+rs));
+  }
+
+  const shortMA=mean(a,7);
+  const longMA=mean(a,30);
+
+  const momentum=
+    (a[a.length-1]/a[a.length-8]-1)*100;
+
+  let score=0;
+
+  score+=shortMA>longMA?0.38:-0.38;
+
+  score+=Math.max(-1,Math.min(1,momentum/5))*0.32;
+
+  score+=(50-rsi)/50*0.20;
+
+  score=Math.max(-1,Math.min(1,score));
+
+  let signal="HOLD";
+
+  if(score>0.22) signal="BUY";
+  if(score< -0.22) signal="SELL";
+
+  return {
+    signal,
+    score:Math.round(Math.abs(score)*100),
+    rsi:rsi.toFixed(1),
+    momentum:momentum.toFixed(2)
+  };
+}
+
+
+// دریافت قیمت‌ها
+async function refreshPrices(){
+
+  if(!API_URL){
+    $("connection").textContent=
+      "آدرس API هنوز تنظیم نشده است.";
+    return;
+  }
+
+  $("connection").textContent="در حال دریافت اطلاعات...";
+
+  try{
+
+    const response=await fetch(API_URL,{
+      cache:"no-store"
+    });
+
+    if(!response.ok)
+      throw new Error("API error");
+
+    const data=await response.json();
+
+    // این قسمت باید مطابق ساختار واقعی API تنظیم شود
+    const gold=Number(data.gold18_toman);
+    const usd=Number(data.usd_toman);
+
+    if(!(gold>0)||!(usd>0))
+      throw new Error("Invalid price");
+
+    $("goldPrice").textContent=formatPrice(gold);
+    $("usdPrice").textContent=formatPrice(usd);
+
+    const stamp=new Intl.DateTimeFormat("fa-IR",{
+      timeZone:"Asia/Tehran",
+      hour:"2-digit",
+      minute:"2-digit",
+      second:"2-digit"
+    }).format(new Date());
+
+    $("goldUpdated").textContent="دریافت: "+stamp;
+    $("usdUpdated").textContent="دریافت: "+stamp;
+
+    $("connection").textContent=
+      "اطلاعات قیمت دریافت شد.";
+
+    const historyResponse=await fetch(GOLD_HISTORY_URL);
+
+    if(!historyResponse.ok)
+      throw new Error("History unavailable");
+
+    const historyData=await historyResponse.json();
+
+    const history=historyData.history_gold18_toman;
+
+    const result=predict(history);
+
+    if(result){
+
+      $("signalValue").textContent=
+        result.signal+" | امتیاز مدل: "+result.score;
+
+      $("signalReason").textContent=
+        "RSI: "+result.rsi+
+        " | مومنتوم: "+result.momentum+
+        "%";
+
+    }else{
+
+      $("signalValue").textContent="HOLD";
+
+      $("signalReason").textContent=
+        "داده تاریخی کافی برای تحلیل وجود ندارد.";
+    }
+
+  }catch(error){
+
+    $("connection").textContent=
+      "خطا در دریافت داده؛ اتصال یا ساختار API را بررسی کنید.";
+
+  }
+}
+
+
+// به‌روزرسانی هر ۱۰ دقیقه
+refreshPrices();
+
+setInterval(refreshPrices,10*60*1000);
+
+</script>
+
+</body>
+</html>
